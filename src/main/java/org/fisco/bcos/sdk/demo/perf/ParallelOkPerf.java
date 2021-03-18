@@ -109,7 +109,8 @@ public class ParallelOkPerf {
         switch (command) {
             case "add":
                 // deploy ParallelOk
-                parallelOk = ParallelOk.deploy(client, client.getCryptoSuite().getCryptoKeyPair());
+                parallelOk = ParallelOk.load("0x000000000000000",client, client.getCryptoSuite().getCryptoKeyPair());
+                // parallelOk = ParallelOk.deploy(client, client.getCryptoSuite().getCryptoKeyPair());
                 // enable parallel
                 parallelOk.enableParallel();
                 System.out.println(

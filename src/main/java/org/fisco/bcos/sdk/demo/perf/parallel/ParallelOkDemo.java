@@ -106,7 +106,7 @@ public class ParallelOkDemo {
             throws InterruptedException, IOException {
         System.out.println("===================================================================");
         System.out.println("Start UserAdd test, count " + userCount);
-        RateLimiter limiter = RateLimiter.create(qps.intValue());
+        RateLimiter limiter = RateLimiter.create(userCount.intValue());
 
         long currentSeconds = System.currentTimeMillis() / 1000L;
         Integer area = userCount.intValue() / 10;
@@ -114,60 +114,62 @@ public class ParallelOkDemo {
         collector.setTotal(userCount.intValue());
         collector.setStartTimestamp(startTime);
         AtomicInteger sendFailed = new AtomicInteger(0);
-        for (Integer i = 0; i < userCount.intValue(); i++) {
-            final Integer index = i;
-            limiter.acquire();
-            threadPoolService
-                    .getThreadPool()
-                    .execute(
-                            new Runnable() {
-                                @Override
-                                public void run() {
-                                    // generate the user according to currentSeconds
-                                    String user =
-                                            Long.toHexString(currentSeconds)
-                                                    + Integer.toHexString(index);
-                                    BigInteger amount = new BigInteger("1000000000");
-                                    DagTransferUser dtu = new DagTransferUser();
-                                    dtu.setUser(user);
-                                    dtu.setAmount(amount);
-                                    ParallelOkCallback callback =
-                                            new ParallelOkCallback(
-                                                    collector,
-                                                    dagUserInfo,
-                                                    ParallelOkCallback.ADD_USER_CALLBACK);
-                                    callback.setTimeout(0);
-                                    callback.setUser(dtu);
-                                    try {
-                                        callback.recordStartTime();
-                                        parallelOk.set(user, amount, callback);
-                                        int current = sended.incrementAndGet();
+        for (int i=0; i<userCount.intValue()/qps.intValue();i++){
+            for (Integer j = 0; j < qps.intValue(); j++) {
+                final Integer index = i;
+                limiter.acquire();
+                threadPoolService
+                        .getThreadPool()
+                        .execute(
+                                new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        // generate the user according to currentSeconds
+                                        String user =
+                                                Long.toHexString(currentSeconds)
+                                                        + Integer.toHexString(index);
+                                        BigInteger amount = new BigInteger("1000000000");
+                                        DagTransferUser dtu = new DagTransferUser();
+                                        dtu.setUser(user);
+                                        dtu.setAmount(amount);
+                                        ParallelOkCallback callback =
+                                                new ParallelOkCallback(
+                                                        collector,
+                                                        dagUserInfo,
+                                                        ParallelOkCallback.ADD_USER_CALLBACK);
+                                        callback.setTimeout(0);
+                                        callback.setUser(dtu);
+                                        try {
+                                            callback.recordStartTime();
+                                            parallelOk.set(user, amount, callback);
+                                            int current = sended.incrementAndGet();
 
-                                        if (current >= area && ((current % area) == 0)) {
-                                            long elapsed = System.currentTimeMillis() - startTime;
-                                            double sendSpeed = current / ((double) elapsed / 1000);
-                                            System.out.println(
-                                                    "Already sended: "
-                                                            + current
-                                                            + "/"
-                                                            + userCount
-                                                            + " transactions"
-                                                            + ",QPS="
-                                                            + sendSpeed);
+                                            if (current >= area && ((current % area) == 0)) {
+                                                long elapsed = System.currentTimeMillis() - startTime;
+                                                double sendSpeed = current / ((double) elapsed / 1000);
+                                                System.out.println(
+                                                        "Already sended: "
+                                                                + current
+                                                                + "/"
+                                                                + userCount
+                                                                + " transactions"
+                                                                + ",QPS="
+                                                                + sendSpeed);
+                                            }
+
+                                        } catch (Exception e) {
+                                            logger.warn(
+                                                    "addUser failed, error info: {}", e.getMessage());
+                                            sendFailed.incrementAndGet();
+                                            TransactionReceipt receipt = new TransactionReceipt();
+                                            receipt.setStatus("-1");
+                                            receipt.setMessage(
+                                                    "userAdd failed, error info: " + e.getMessage());
+                                            callback.onResponse(receipt);
                                         }
-
-                                    } catch (Exception e) {
-                                        logger.warn(
-                                                "addUser failed, error info: {}", e.getMessage());
-                                        sendFailed.incrementAndGet();
-                                        TransactionReceipt receipt = new TransactionReceipt();
-                                        receipt.setStatus("-1");
-                                        receipt.setMessage(
-                                                "userAdd failed, error info: " + e.getMessage());
-                                        callback.onResponse(receipt);
                                     }
-                                }
-                            });
+                                });
+            }
         }
         while (collector.getReceived().intValue() != userCount.intValue()) {
             logger.info(
