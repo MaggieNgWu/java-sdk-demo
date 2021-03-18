@@ -114,9 +114,10 @@ public class ParallelOkDemo {
         collector.setTotal(userCount.intValue());
         collector.setStartTimestamp(startTime);
         AtomicInteger sendFailed = new AtomicInteger(0);
-        for (int i=0; i<userCount.intValue()/qps.intValue();i++){
+        int round = userCount.intValue() / qps.intValue();
+        for (int i = 0; i < round; i++) {
             for (Integer j = 0; j < qps.intValue(); j++) {
-                final Integer index = i;
+                final Integer index = j;
                 limiter.acquire();
                 threadPoolService
                         .getThreadPool()
@@ -137,7 +138,7 @@ public class ParallelOkDemo {
                                                         collector,
                                                         dagUserInfo,
                                                         ParallelOkCallback.ADD_USER_CALLBACK);
-                                        callback.setTimeout(0);
+                                        callback.setTimeout(10);
                                         callback.setUser(dtu);
                                         try {
                                             callback.recordStartTime();
@@ -145,8 +146,10 @@ public class ParallelOkDemo {
                                             int current = sended.incrementAndGet();
 
                                             if (current >= area && ((current % area) == 0)) {
-                                                long elapsed = System.currentTimeMillis() - startTime;
-                                                double sendSpeed = current / ((double) elapsed / 1000);
+                                                long elapsed =
+                                                        System.currentTimeMillis() - startTime;
+                                                double sendSpeed =
+                                                        current / ((double) elapsed / 1000);
                                                 System.out.println(
                                                         "Already sended: "
                                                                 + current
@@ -159,12 +162,14 @@ public class ParallelOkDemo {
 
                                         } catch (Exception e) {
                                             logger.warn(
-                                                    "addUser failed, error info: {}", e.getMessage());
+                                                    "addUser failed, error info: {}",
+                                                    e.getMessage());
                                             sendFailed.incrementAndGet();
                                             TransactionReceipt receipt = new TransactionReceipt();
                                             receipt.setStatus("-1");
                                             receipt.setMessage(
-                                                    "userAdd failed, error info: " + e.getMessage());
+                                                    "userAdd failed, error info: "
+                                                            + e.getMessage());
                                             callback.onResponse(receipt);
                                         }
                                     }
